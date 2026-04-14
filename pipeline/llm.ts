@@ -62,7 +62,7 @@ export async function llmCall(req: LlmRequest): Promise<string> {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": "https://cro-agent-iota.vercel.app/",
         "X-Title": "AutoCRO",
       },
       body: JSON.stringify(body),
