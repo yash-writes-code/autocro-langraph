@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 
 /**
- * Screenshots and ad images are written to `public/output/` so Next.js serves
- * them statically at `/output/<filename>` without any custom server setup.
+ * Screenshots and ad images are written to the OS temp directory
+ * because Vercel Serverless/Edge functions strictly enforce read-only filesystems.
  */
-const OUTPUT_DIR = path.join(process.cwd(), "public", "output");
+const OUTPUT_DIR = path.join(os.tmpdir(), "autocro-output");
 
 export function getOutputDir(): string {
   return OUTPUT_DIR;

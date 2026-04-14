@@ -1,6 +1,6 @@
 /** Step 17 — Assemble all collected state into the final API response payload. */
 import type { PipelineState, FinalResponse, Change } from "../types";
-import { OUTPUT_IMAGE_ROUTES, VIEWPORT } from "../constants";
+import { VIEWPORT } from "../constants";
 import { log, elapsed } from "../logger";
 
 const NODE = "buildFinalResponse";
@@ -38,8 +38,8 @@ export async function buildFinalResponse(
   const finalResponse: FinalResponse = {
     success: injectionSuccess,
     images: {
-      before: OUTPUT_IMAGE_ROUTES.before,
-      after: injectionSuccess ? OUTPUT_IMAGE_ROUTES.after : OUTPUT_IMAGE_ROUTES.before,
+      before: state.beforePath,
+      after: injectionSuccess ? state.afterPath : state.beforePath,
     },
     ad_intent: {
       offer_type: adJson?.offer_type ?? "none",

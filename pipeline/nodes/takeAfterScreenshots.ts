@@ -29,17 +29,17 @@ export async function takeAfterScreenshots(
   log.step(NODE, "Capturing after hero screenshot…");
 
   const page = getPage();
-  const outputDir = getOutputDir();
-  const afterPath = `${outputDir}/after.png`;
 
-  await page.screenshot({
-    path: afterPath,
+  const base64Hero = await page.screenshot({
+    encoding: "base64",
     fullPage: false,
-    type: "png",
+    type: "jpeg",
+    quality: 80,
     clip: { x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height },
-  });
+  }) as string;
 
-  log.info(NODE, `Hero after screenshot saved → ${afterPath}`);
+  const afterPath = `data:image/jpeg;base64,${base64Hero}`;
+  log.info(NODE, `Hero after screenshot captured in memory`);
 
   const { tiles: afterTiles } = await captureFullPageTiles("after");
   log.info(NODE, `Full-page tiles captured: ${afterTiles.length} tile(s)`);

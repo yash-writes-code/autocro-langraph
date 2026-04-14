@@ -43,22 +43,20 @@ export async function captureFullPageTiles(
     )
   );
 
-  const filename = `${prefix}-tile-0.png`;
-  const filePath = `${outputDir}/${filename}`;
-
   // fullPage: true expands the viewport to the full document height internally
   // and captures everything in one shot — no manual scrolling needed.
-  await page.screenshot({
-    path: filePath,
+  const base64Str = await page.screenshot({
+    encoding: "base64",
     fullPage: true,
-    type: "png",
-  });
+    type: "jpeg",
+    quality: 70,
+  }) as string;
 
-  log.info(NODE, `Full-page screenshot → ${filename} (totalHeight=${totalHeight}px)`);
+  log.info(NODE, `Full-page screenshot captured in memory (totalHeight=${totalHeight}px)`);
 
   const tiles: Tile[] = [
     {
-      src: `/output/${filename}`,
+      src: `data:image/jpeg;base64,${base64Str}`,
       top: 0,
       width: VIEWPORT.width,
       height: totalHeight,
@@ -76,19 +74,19 @@ export async function takeBeforeScreenshots(
   log.step(NODE, "Capturing before screenshots (full-page)…");
 
   const page = getPage();
-  const outputDir = getOutputDir();
-  const beforePath = `${outputDir}/before.png`;
 
   // Hero / above-the-fold screenshot (kept for the slider comparison on the main page).
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({
-    path: beforePath,
+  const base64Hero = await page.screenshot({
+    encoding: "base64",
     fullPage: false,
-    type: "png",
+    type: "jpeg",
+    quality: 80,
     clip: { x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height },
-  });
+  }) as string;
 
-  log.info(NODE, `Hero screenshot saved → ${beforePath}`);
+  const beforePath = `data:image/jpeg;base64,${base64Hero}`;
+  log.info(NODE, `Hero screenshot captured in memory`);
 
   const { tiles } = await captureFullPageTiles("before");
 
