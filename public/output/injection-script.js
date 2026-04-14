@@ -3,48 +3,43 @@
 
   var zones = [
   {
-    "zone": "headline",
-    "sel": "div > div.bg-dark-primary.min-h-screen > main > section.min-h-screen.flex > div.container.mx-auto > div.text-center.max-w-4xl > div > h1.text-4xl.md\\:text-5xl",
-    "text": "Stop Wasting Hours on Project Chaos"
-  },
-  {
     "zone": "subheadline",
-    "sel": "div > div.bg-dark-primary.min-h-screen > main > section.min-h-screen.flex > div.container.mx-auto > div.text-center.max-w-4xl > p.text-lg.md\\:text-xl",
-    "text": "Reclaim your 8 hours weekly. Expert CRO for remote teams to eliminate project chaos and boost results."
+    "sel": "div > div > div.homepage-hero-paralax-container > section.section.section-pullup-before > div.owl-wrapper-outer > div.owl-wrapper.owl-origin > div.owl-item > div.slide > div.section-inner.titleban > p.btn-default.inverse",
+    "text": "Find Out More"
   },
   {
     "zone": "cta",
-    "sel": "div > div.bg-dark-primary.min-h-screen > main > section.min-h-screen.flex > div.container.mx-auto > div.text-center.max-w-4xl > div.flex.flex-col > a.w-full.sm\\:w-auto > button.w-full.h-\\[52px\\]",
-    "text": "Claim 50% Off Now"
+    "sel": "div > div > div > a",
+    "text": "Fitness First"
   },
   {
     "zone": "cta_secondary",
-    "sel": "div > div.bg-dark-primary.min-h-screen > main > section.py-20.relative > div.container.mx-auto > div.grid.grid-cols-1 > div.relative > form.space-y-6 > button.w-full.h-\\[52px\\]",
-    "text": "Get Your Discount"
+    "sel": "div > div > div.homepage-hero-paralax-container > section.section.section-pullup-before > div.owl-wrapper-outer > div.owl-wrapper.owl-origin > div.owl-item.owl-fade-out > div.slide > div.section-inner.titleban > p.btn-default.inverse > a",
+    "text": "Start Now"
   },
   {
     "zone": "cta_tertiary",
-    "sel": "div > div.bg-dark-primary.min-h-screen > main > section.min-h-screen.flex > div.container.mx-auto > div.text-center.max-w-4xl > div.flex.flex-col > button.w-full.sm\\:w-auto",
-    "text": "Grab 50% Off"
+    "sel": "div > div > div.homepage-hero-paralax-container > section.section.section-pullup-before > div.owl-wrapper-outer > div.owl-wrapper.owl-origin > div.owl-item > div.slide > div.section-inner.titleban > p.btn-default.inverse > a",
+    "text": "Find Out More"
   }
 ];
   var styleProfile = {
-  "fontFamily": "Montserrat, sans-serif",
-  "textColor": "rgb(255, 255, 255)",
-  "surfaceColor": "rgb(0, 0, 0)",
-  "accentColor": "rgb(255, 255, 255)",
-  "accentTextColor": "rgb(255, 255, 255)",
+  "fontFamily": "\"Calibri W01 Regular 904604\", tahoma, arial, helvetica, verdana, sans-serif",
+  "textColor": "rgb(122, 122, 122)",
+  "surfaceColor": "rgb(200, 16, 46)",
+  "accentColor": "rgb(122, 122, 122)",
+  "accentTextColor": "rgb(200, 16, 46)",
   "accentSoftColor": "rgba(17, 24, 39, 0.08)",
-  "accentBorderColor": "rgb(229, 231, 235)",
+  "accentBorderColor": "rgb(200, 16, 46)",
   "borderRadius": "0px",
   "cardRadius": "0px",
   "shadow": "0 12px 28px rgba(15, 23, 42, 0.18)",
   "softShadow": "0 12px 24px rgba(15, 23, 42, 0.08)"
 };
   var banner = {
-  "text": "DISCOUNT — Stop wasting 8hrs/week on project chaos.",
-  "backgroundColor": "rgb(255, 255, 255)",
-  "textColor": "rgb(255, 255, 255)"
+  "text": "FREE TRIAL — Increase your muscle power — Get the challenge for your strong body",
+  "backgroundColor": "rgb(122, 122, 122)",
+  "textColor": "rgb(200, 16, 46)"
 };
 
   function setStyles(node, styles) {

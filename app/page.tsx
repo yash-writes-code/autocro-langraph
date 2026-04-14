@@ -70,6 +70,7 @@ function ChangeCard({ change }: ChangeCardProps) {
 
 export default function HomePage() {
   const [adFile, setAdFile] = useState<File | null>(null);
+  const [adInputUrl, setAdInputUrl] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pageUrl, setPageUrl] = useState<string>("");
   const [status, setStatus] = useState<string>("Ready to analyse.");
@@ -85,6 +86,7 @@ export default function HomePage() {
 
   function applyFile(file: File | null): void {
     setAdFile(file);
+    setAdInputUrl("");
     setResult(null);
     setError("");
     setStatus(file ? "Ad creative attached." : "Ready to analyse.");
@@ -96,8 +98,29 @@ export default function HomePage() {
     setPreviewUrl(file ? createPreviewUrl(file) : null);
   }
 
+  function applyUrl(url: string): void {
+    setAdInputUrl(url);
+    setAdFile(null);
+    setResult(null);
+    setError("");
+
+    if (!url) {
+      setPreviewUrl(null);
+      setStatus("Ready to analyse.");
+      return;
+    }
+    
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
+    setPreviewUrl(url);
+    setStatus("Ad creative URL attached.");
+  }
+
   function useSampleAd(): void {
     setAdFile(null);
+    setAdInputUrl("");
     setResult(null);
     setError("");
 
@@ -128,8 +151,12 @@ export default function HomePage() {
 
       if (adFile) {
         formData.append("adFile", adFile);
-      } else {
+      } else if (adInputUrl) {
+        formData.append("adUrl", adInputUrl);
+      } else if (previewUrl === SAMPLE_AD_PATH) {
         formData.append("adUrl", new URL(SAMPLE_AD_PATH, window.location.origin).toString());
+      } else {
+        throw new Error("Please provide an Ad File, an Ad URL, or use the sample ad.");
       }
 
       const response = await fetch("/api/personalise", {
@@ -171,8 +198,8 @@ export default function HomePage() {
 
       <form className="panel" onSubmit={handleSubmit}>
         <div className="input-grid">
-          <div className="field-column">
-            <label className="field-label">Ad Creative</label>
+          <div className="field-column" style={{ display: "flex", flexDirection: "column" }}>
+            <label className="field-label">Ad Creative Upload</label>
             <label
               className={`dropzone${isDragActive ? " is-active" : ""}`}
               onDragEnter={() => setIsDragActive(true)}
@@ -194,18 +221,32 @@ export default function HomePage() {
                 <div>
                   <strong>Drop JPG, PNG, or GIF here</strong>
                   <p className="hint">
-                    Troopod stores the ad as <code>/output/ad_input.*</code> before
-                    extraction. No external model APIs are used.
+                    Upload an explicit file, or skip to provide a URL below.
                   </p>
                 </div>
               )}
-              <div className="dropzone-actions">
+              <div className="dropzone-actions" style={{ flexWrap: "wrap", justifyContent: "center" }}>
                 <span className="ghost-button">Choose file</span>
-                <button className="ghost-button" onClick={(event) => { event.preventDefault(); useSampleAd(); }} type="button">
+                <button className="ghost-button" onClick={(event) => { event.preventDefault(); useSampleAd(); }} type="button" suppressHydrationWarning>
                   Use sample ad
                 </button>
               </div>
             </label>
+
+            <div style={{ margin: "1rem 0", display: "flex", alignItems: "center", gap: "1rem" }}>
+                <span style={{ flex: 1, borderTop: "1px solid currentColor", opacity: 0.15 }}></span>
+                <span style={{ fontSize: "0.85rem", opacity: 0.5, fontWeight: 500, textTransform: "uppercase" }}>or paste image url</span>
+                <span style={{ flex: 1, borderTop: "1px solid currentColor", opacity: 0.15 }}></span>
+            </div>
+
+            <input
+              className="text-input"
+              id="adUrl"
+              onChange={(event) => applyUrl(event.target.value)}
+              placeholder="https://example.com/ad-image.jpg"
+              type="url"
+              value={adInputUrl}
+            />
           </div>
 
           <div className="field-column">
@@ -228,7 +269,7 @@ export default function HomePage() {
 
         <div className="submit-row">
           <div className={`status-line${error ? " error" : ""}`}>{error || status}</div>
-          <button className="primary-button" disabled={isSubmitting} type="submit">
+          <button className="primary-button" disabled={isSubmitting} type="submit" suppressHydrationWarning>
             {isSubmitting ? "Running pipeline..." : "Analyse and Personalise"}
           </button>
         </div>
