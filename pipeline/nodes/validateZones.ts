@@ -3,19 +3,25 @@
  * live DOM are dropped entirely. */
 import type { PipelineState, Zone, AdJson } from "../types";
 import { getPage } from "../browserContext";
+import { log, elapsed } from "../logger";
+
+const NODE = "validateZones";
 
 // ─── Check 1: length ─────────────────────────────────────────────────────────
 
 function checkLength(zone: Zone): Zone {
   if (!zone.new_text) {
+    log.warn(NODE, `[length] ${zone.zone} — null output, reverting to original`);
     return { ...zone, new_text: zone.current_text, fail: "null_output" };
   }
   if (zone.new_text.length > zone.max_chars) {
-    console.warn(
-      `[validate] ${zone.zone} too long (${zone.new_text.length} > ${zone.max_chars}), fallback`
+    log.warn(
+      NODE,
+      `[length] ${zone.zone} too long (${zone.new_text.length} > ${zone.max_chars} chars) — reverting`
     );
     return { ...zone, new_text: zone.current_text, fail: "length" };
   }
+  log.info(NODE, `[length] ${zone.zone} OK (${zone.new_text.length}/${zone.max_chars} chars)`);
   return zone;
 }
 
@@ -38,12 +44,14 @@ function checkFactAnchor(zone: Zone, adJson: AdJson): Zone {
   const invented = [...outNums].filter((n) => !adNums.has(n));
 
   if (invented.length > 0) {
-    console.warn(
-      `[validate] ${zone.zone} invented facts: ${invented.join(", ")}, fallback`
+    log.warn(
+      NODE,
+      `[fact-anchor] ${zone.zone} invented numbers: [${invented.join(", ")}] — reverting`
     );
     return { ...zone, new_text: zone.current_text, fail: "invented_fact" };
   }
 
+  log.info(NODE, `[fact-anchor] ${zone.zone} OK (no invented numbers)`);
   return zone;
 }
 
@@ -53,11 +61,10 @@ async function checkSelector(zone: Zone): Promise<Zone | null> {
   const page = getPage();
   const exists = await page.$(zone.selector);
   if (!exists) {
-    console.warn(
-      `[validate] ${zone.zone} selector not found (${zone.selector}), zone dropped`
-    );
+    log.warn(NODE, `[selector] ${zone.zone} — selector not found "${zone.selector}", zone DROPPED`);
     return null;
   }
+  log.info(NODE, `[selector] ${zone.zone} OK — "${zone.selector}"`);
   return zone;
 }
 
@@ -67,14 +74,19 @@ export async function validateZones(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
   const { rewrittenZones, adJson } = state;
+  const t = Date.now();
+
+  log.step(NODE, `Validating ${rewrittenZones.length} rewritten zone(s)…`);
 
   if (!adJson) {
+    log.warn(NODE, "adJson missing — skipping validation, returning empty list");
     return { validatedZones: [] };
   }
 
   const validated: Zone[] = [];
 
   for (let zone of rewrittenZones) {
+    log.info(NODE, `── Checking zone: ${zone.zone}`);
     zone = checkLength(zone);
     if (!zone.fail) zone = checkFactAnchor(zone, adJson);
 
@@ -83,6 +95,13 @@ export async function validateZones(
 
     validated.push(verified);
   }
+
+  log.step(NODE, `Validation done (${elapsed(t)}) — ${validated.length}/${rewrittenZones.length} zone(s) passed`, {
+    passed: validated.map((z) => z.zone),
+    dropped: rewrittenZones
+      .filter((z) => !validated.find((v) => v.zone === z.zone))
+      .map((z) => z.zone),
+  });
 
   return { validatedZones: validated };
 }

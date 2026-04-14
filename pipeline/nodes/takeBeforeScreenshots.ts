@@ -4,6 +4,9 @@ import type { PipelineState, Tile } from "../types";
 import { getPage } from "../browserContext";
 import { getOutputDir } from "../fsPaths";
 import { VIEWPORT } from "../constants";
+import { log, elapsed } from "../logger";
+
+const NODE = "takeBeforeScreenshots";
 
 async function delay(ms: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -29,6 +32,8 @@ async function captureFullPageTiles(
   const tiles: Tile[] = [];
   const tileCount = Math.max(1, Math.ceil(totalHeight / VIEWPORT.height));
 
+  log.info(NODE, `Full-page height ${totalHeight}px → ${tileCount} tile(s) for prefix="${prefix}"`);
+
   for (let index = 0; index < tileCount; index++) {
     const top = index * VIEWPORT.height;
     const clipHeight = Math.min(VIEWPORT.height, totalHeight - top);
@@ -44,6 +49,8 @@ async function captureFullPageTiles(
       type: "png",
       clip: { x: 0, y: 0, width: VIEWPORT.width, height: clipHeight },
     });
+
+    log.info(NODE, `  tile ${index + 1}/${tileCount} → ${filename} (y=${top}, h=${clipHeight})`);
 
     tiles.push({
       src: `/output/${filename}`,
@@ -63,6 +70,9 @@ export async function takeBeforeScreenshots(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
   void state;
+  const t = Date.now();
+  log.step(NODE, "Capturing before hero screenshot…");
+
   const page = getPage();
   const outputDir = getOutputDir();
   const beforePath = `${outputDir}/before.png`;
@@ -74,8 +84,11 @@ export async function takeBeforeScreenshots(
     clip: { x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height },
   });
 
+  log.info(NODE, `Hero screenshot saved → ${beforePath}`);
+
   const { tiles } = await captureFullPageTiles("before");
 
+  log.step(NODE, `Before screenshots complete — ${tiles.length} tile(s) (${elapsed(t)})`);
   return { beforePath, beforeTiles: tiles };
 }
 

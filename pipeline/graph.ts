@@ -1,33 +1,31 @@
 /**
  * LangGraph StateGraph — AutoCRO personalisation pipeline.
  *
- * Execution topology (parallel fan-out after openBrowser):
+ * Execution topology (fully sequential):
  *
  *   START
  *     └─ resolveInputs
- *          ├─ openBrowser ─► extractZones ─► extractStyleProfile ─► takeBeforeScreenshots ─┐
- *          └─ extractAd ────────────────────────────────────────────────────────────────────┘
- *                                                                                    rewriteContent
- *                                                                                         │
- *                                                                                    validateZones
- *                                                                                         │
- *                                                                                 buildBannerAndScript
- *                                                                                         │
- *                                                                                  injectAndStabilise
- *                                                                                         │
- *                                                                                 checkAndFixOverflow
- *                                                                                         │
- *                                                                                    captureRects
- *                                                                                         │
- *                                                                                takeAfterScreenshots
- *                                                                                         │
- *                                                                                 buildFinalResponse
- *                                                                                         │
- *                                                                                        END
+ *          └─ extractAd                  ← classify ad intent first (Ollama vision)
+ *               └─ openBrowser
+ *                    └─ extractZones
+ *                         └─ extractStyleProfile
+ *                              └─ takeBeforeScreenshots
+ *                                   └─ rewriteContent   ← fan-in removed, single predecessor
+ *                                        └─ validateZones
+ *                                             └─ buildBannerAndScript
+ *                                                  └─ injectAndStabilise
+ *                                                       └─ checkAndFixOverflow
+ *                                                            └─ captureRects
+ *                                                                 └─ takeAfterScreenshots
+ *                                                                      └─ buildFinalResponse
+ *                                                                           └─ END
  *
- * The `rewriteContent` node has two incoming edges (from takeBeforeScreenshots
- * and from extractAd). LangGraph only executes it once BOTH predecessors have
- * written their state — this is the fan-in join point.
+ * NOTE: extractAd previously ran in parallel with the browser chain, but
+ * LangGraph's fan-in semantics caused rewriteContent (and the entire tail)
+ * to execute TWICE — once per incoming edge — leading to checkAndFixOverflow
+ * seeing 0 validatedZones on the first spurious pass and an "Execution context
+ * was destroyed" error when takeAfterScreenshots closed the page while the
+ * second pass was still running. Making extractAd sequential eliminates both.
  */
 
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
@@ -43,6 +41,7 @@ import type {
   FinalResponse,
 } from "./types";
 import { closeBrowserContext } from "./browserContext";
+import { log, elapsed } from "./logger";
 
 // ─── Node imports ─────────────────────────────────────────────────────────────
 import { resolveInputs } from "./nodes/resolveInputs";
@@ -127,20 +126,18 @@ const workflow = new StateGraph(PipelineStateAnnotation)
   // ── Entry ──────────────────────────────────────────────────────────────────
   .addEdge(START, "resolveInputs")
 
-  // ── Fan-out after resolveInputs: browser pipeline AND ad extraction ────────
-  .addEdge("resolveInputs", "openBrowser")
-  .addEdge("resolveInputs", "extractAd")   // parallel branch
-
-  // ── Browser sequential chain ───────────────────────────────────────────────
+  // ── Fully sequential chain ─────────────────────────────────────────────────
+  // extractAd runs first so adJson is available before the browser opens.
+  // Previously extractAd ran in parallel with the browser chain, but that
+  // caused LangGraph to fire rewriteContent (and all downstream nodes) twice —
+  // once per incoming edge — producing a 0-zone overflow pass and a
+  // "Execution context was destroyed" crash when the page was closed mid-chain.
+  .addEdge("resolveInputs", "extractAd")
+  .addEdge("extractAd", "openBrowser")
   .addEdge("openBrowser", "extractZones")
   .addEdge("extractZones", "extractStyleProfile")
   .addEdge("extractStyleProfile", "takeBeforeScreenshots")
-
-  // ── Fan-in: both branches must complete before rewriteContent runs ─────────
   .addEdge("takeBeforeScreenshots", "rewriteContent")
-  .addEdge("extractAd", "rewriteContent")  // join edge
-
-  // ── Sequential tail ────────────────────────────────────────────────────────
   .addEdge("rewriteContent", "validateZones")
   .addEdge("validateZones", "buildBannerAndScript")
   .addEdge("buildBannerAndScript", "injectAndStabilise")
@@ -158,7 +155,28 @@ export async function runGraph(
   pageUrl: string,
   adFilePath: string
 ): Promise<FinalResponse> {
+  const t = Date.now();
   const initialState: Partial<PipelineState> = { pageUrl, adFilePath };
+
+  log.graph(`▶  Pipeline START  →  ${pageUrl}`);
+  log.info("graph", "Topology", {
+    nodes: [
+      "resolveInputs",
+      "extractAd",
+      "openBrowser",
+      "extractZones",
+      "extractStyleProfile",
+      "takeBeforeScreenshots",
+      "rewriteContent",
+      "validateZones",
+      "buildBannerAndScript",
+      "injectAndStabilise",
+      "checkAndFixOverflow",
+      "captureRects",
+      "takeAfterScreenshots",
+      "buildFinalResponse",
+    ],
+  });
 
   try {
     const result = await app.invoke(initialState as PipelineState);
@@ -168,7 +186,14 @@ export async function runGraph(
       throw new Error("Pipeline completed without producing a final response");
     }
 
+    log.graph(
+      `✔  Pipeline DONE   →  ${elapsed(t)}  |  success=${response.success}  |  zones_changed=${response.meta.zones_changed}`
+    );
+
     return response;
+  } catch (err) {
+    log.error("graph", `Pipeline FAILED after ${elapsed(t)}: ${(err as Error).message}`);
+    throw err;
   } finally {
     // Always close the browser, even if a node threw.
     await closeBrowserContext();

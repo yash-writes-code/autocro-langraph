@@ -1,7 +1,12 @@
 /** Steps 11–12 — Build banner data from the ad intent and assemble the
  * self-executing injection script from validated zones + style profile.
- * Pure data transforms, no I/O. */
+ * Scripts are then saved to the output directory. */
 import type { PipelineState, BannerData, Zone, StyleProfile } from "../types";
+import { log, elapsed } from "../logger";
+import fs from "node:fs/promises";
+import { getOutputDir } from "../fsPaths";
+
+const NODE = "buildBannerAndScript";
 
 // ─── Step 11: Banner ─────────────────────────────────────────────────────────
 
@@ -9,7 +14,10 @@ function buildBanner(
   state: PipelineState
 ): BannerData | null {
   const { adJson, styleProfile } = state;
-  if (!adJson) return null;
+  if (!adJson) {
+    log.warn(NODE, "adJson missing — no banner will be generated");
+    return null;
+  }
 
   // Build banner text from key_messages, prepending the offer type if meaningful.
   const parts: string[] = [];
@@ -21,13 +29,24 @@ function buildBanner(
   }
 
   const text = parts.join(" — ").trim();
-  if (!text) return null;
+  if (!text) {
+    log.info(NODE, "Banner text is empty — skipping banner");
+    return null;
+  }
 
-  return {
+  const banner: BannerData = {
     text,
     backgroundColor: styleProfile?.accentColor ?? "#111827",
     textColor: styleProfile?.accentTextColor ?? "#ffffff",
   };
+
+  log.info(NODE, "Banner built", {
+    text: banner.text,
+    backgroundColor: banner.backgroundColor,
+    textColor: banner.textColor,
+  });
+
+  return banner;
 }
 
 // ─── Step 12: Injection script ────────────────────────────────────────────────
@@ -112,11 +131,28 @@ function buildScript(
 export async function buildBannerAndScript(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
+  const t = Date.now();
+  log.step(NODE, `Building banner + injection script for ${state.validatedZones.length} zone(s)…`);
+
   const banner = buildBanner(state);
   const injectionScript = buildScript(
     state.validatedZones,
     state.styleProfile,
     banner
   );
+
+  log.info(NODE, `Injection script built — ${injectionScript.length} chars`);
+
+  const outputDir = getOutputDir();
+  const scriptPath = `${outputDir}/injection-script.js`;
+  try {
+    await fs.writeFile(scriptPath, injectionScript, "utf-8");
+    log.info(NODE, `Injection script saved to disk → ${scriptPath}`);
+  } catch (error) {
+    log.error(NODE, `Failed to save injection script: ${(error as Error).message}`);
+  }
+
+  log.step(NODE, `Done (${elapsed(t)})`);
+
   return { banner, injectionScript };
 }

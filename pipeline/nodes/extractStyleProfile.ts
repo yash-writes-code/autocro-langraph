@@ -2,11 +2,17 @@
  * element to produce a style "fingerprint" used to style injected elements. */
 import type { PipelineState, StyleProfile } from "../types";
 import { getPage } from "../browserContext";
+import { log, elapsed } from "../logger";
+
+const NODE = "extractStyleProfile";
 
 export async function extractStyleProfile(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
   void state;
+  const t = Date.now();
+  log.step(NODE, "Reading computed styles from body and first visible button…");
+
   const page = getPage();
 
   const styleProfile: StyleProfile = await page.evaluate(() => {
@@ -71,5 +77,13 @@ export async function extractStyleProfile(
     };
   });
 
+  log.info(NODE, `Style profile extracted (${elapsed(t)})`, {
+    fontFamily: styleProfile.fontFamily,
+    textColor: styleProfile.textColor,
+    accentColor: styleProfile.accentColor,
+    borderRadius: styleProfile.borderRadius,
+  });
+
+  log.step(NODE, `Done (${elapsed(t)})`);
   return { styleProfile };
 }

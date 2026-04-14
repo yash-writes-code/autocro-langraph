@@ -2,6 +2,9 @@
  * trim the text to a word boundary, re-inject, and re-check. */
 import type { PipelineState, OverflowItem, Zone } from "../types";
 import { getPage } from "../browserContext";
+import { log, elapsed } from "../logger";
+
+const NODE = "checkAndFixOverflow";
 
 async function delay(ms: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -35,8 +38,12 @@ export async function checkAndFixOverflow(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
   const { validatedZones, injectionSuccess } = state;
+  const t = Date.now();
+
+  log.step(NODE, `Checking overflow for ${validatedZones.length} zone(s)…`);
 
   if (!injectionSuccess) {
+    log.warn(NODE, "Injection failed — skipping overflow check, marking all as non-overflow");
     const overflowCheck: OverflowItem[] = validatedZones.map((z) => ({
       zone: z.zone,
       overflow: false,
@@ -46,17 +53,23 @@ export async function checkAndFixOverflow(
 
   // First pass — detect overflows.
   let overflowCheck = await checkOverflow(validatedZones);
-  overflowCheck
-    .filter((item) => item.overflow)
-    .forEach((item) =>
-      console.warn(`[overflow] ${item.zone} is overflowing its container`)
-    );
+  const overflowing = overflowCheck.filter((item) => item.overflow);
+
+  if (overflowing.length > 0) {
+    log.warn(NODE, `${overflowing.length} zone(s) overflowing`, {
+      zones: overflowing.map((i) => i.zone),
+    });
+  } else {
+    log.info(NODE, "No overflow detected on first pass");
+  }
 
   // Trim overflowing zones and re-inject them.
   const trimmedZones = validatedZones.map((zone) => {
     const overflow = overflowCheck.find((item) => item.zone === zone.zone)?.overflow;
     if (!overflow) return zone;
-    return { ...zone, new_text: trimToWordBoundary(zone.new_text, zone.max_chars) };
+    const trimmed = trimToWordBoundary(zone.new_text, zone.max_chars);
+    log.info(NODE, `Trimming ${zone.zone}: "${zone.new_text}" → "${trimmed}"`);
+    return { ...zone, new_text: trimmed };
   });
 
   const changedZones = trimmedZones.filter(
@@ -64,6 +77,7 @@ export async function checkAndFixOverflow(
   );
 
   if (changedZones.length > 0) {
+    log.info(NODE, `Re-injecting ${changedZones.length} trimmed zone(s)…`);
     const page = getPage();
     await page.evaluate(
       (zones: Array<{ sel: string; text: string }>) => {
@@ -83,8 +97,18 @@ export async function checkAndFixOverflow(
     await delay(600);
 
     // Second pass — verify fix.
+    log.info(NODE, "Second pass — verifying overflow is resolved…");
     overflowCheck = await checkOverflow(trimmedZones);
+    const stillOverflowing = overflowCheck.filter((i) => i.overflow);
+    if (stillOverflowing.length > 0) {
+      log.warn(NODE, `${stillOverflowing.length} zone(s) still overflowing after trim`, {
+        zones: stillOverflowing.map((i) => i.zone),
+      });
+    } else {
+      log.info(NODE, "All overflows resolved after trim");
+    }
   }
 
+  log.step(NODE, `Overflow check done (${elapsed(t)})`);
   return { overflowCheck, validatedZones: trimmedZones };
 }

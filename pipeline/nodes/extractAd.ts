@@ -6,6 +6,9 @@
 import fs from "node:fs/promises";
 import type { PipelineState, AdJson } from "../types";
 import { EMPTY_AD_JSON, OLLAMA_BASE_URL, OLLAMA_MODEL } from "../constants";
+import { log, elapsed } from "../logger";
+
+const NODE = "extractAd";
 
 function sanitizeJson(rawText: string): string {
   return rawText.replace(/```json|```/g, "").trim();
@@ -36,12 +39,17 @@ Return ONLY valid JSON. No markdown fences.`;
 export async function extractAd(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
+  const t = Date.now();
+  log.step(NODE, `Reading ad creative from disk → ${state.adFilePath}`);
+
   const imageBuffer = await fs.readFile(state.adFilePath);
   const base64Image = imageBuffer.toString("base64");
+  log.info(NODE, `File read: ${(imageBuffer.byteLength / 1024).toFixed(1)} KB, sending to Ollama (${OLLAMA_MODEL})…`);
 
   let responseText = "";
 
   try {
+    log.info(NODE, `POST ${OLLAMA_BASE_URL}/api/generate`);
     const res = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -60,8 +68,11 @@ export async function extractAd(
 
     const data = (await res.json()) as { response?: string };
     responseText = String(data.response ?? "").trim();
+    log.info(NODE, `Ollama response received in ${elapsed(t)}`, {
+      preview: responseText.slice(0, 120) + (responseText.length > 120 ? "…" : ""),
+    });
   } catch (error) {
-    console.warn("[extractAd] Ollama request failed:", (error as Error).message);
+    log.warn(NODE, `Ollama request failed — using empty intent: ${(error as Error).message}`);
     return { adJson: { ...EMPTY_AD_JSON } };
   }
 
@@ -77,9 +88,19 @@ export async function extractAd(
       key_messages: Array.isArray(parsed.key_messages) ? parsed.key_messages : [],
       keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
     };
+
+    log.step(NODE, `Ad intent parsed (${elapsed(t)})`, {
+      primary_goal: adJson.primary_goal,
+      offer_type: adJson.offer_type,
+      urgency_level: adJson.urgency_level,
+      cta_style: adJson.cta_style,
+      tone: adJson.tone,
+      key_messages: adJson.key_messages,
+    });
+
     return { adJson };
   } catch {
-    console.warn("[extractAd] JSON parse failed, using empty intent");
+    log.warn(NODE, "JSON parse failed — using empty intent");
     return { adJson: { ...EMPTY_AD_JSON } };
   }
 }

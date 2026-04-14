@@ -3,8 +3,12 @@
  * receives explicit instructions rather than having to infer them. */
 import type { PipelineState, Zone, AdJson } from "../types";
 import { OLLAMA_BASE_URL, OLLAMA_MODEL } from "../constants";
+import { log, elapsed } from "../logger";
+
+const NODE = "rewriteContent";
 
 function sanitizeJson(rawText: string): string {
+  // Sometimes models still return markdown blocks even with format specified.
   return rawText.replace(/```json|```/g, "").trim();
 }
 
@@ -12,138 +16,181 @@ function buildRules(adJson: AdJson): string {
   const rules: string[] = [];
 
   if (adJson.urgency_level === "high") {
-    rules.push("- Use urgency-signalling language (e.g. 'now', 'today', 'limited time').");
+    rules.push("- Infuse high urgency: Use words like 'now', 'today', 'instantly', or 'limited time' to drive immediate action.");
   } else if (adJson.urgency_level === "medium") {
-    rules.push("- Convey a mild sense of timeliness without being pushy.");
+    rules.push("- Create a subtle sense of timeliness without being overly aggressive.");
   }
 
   if (adJson.offer_type === "limited_spots") {
-    rules.push("- Include scarcity language (e.g. 'limited spots', 'few remaining').");
+    rules.push("- Emphasize scarcity: Make the user feel exclusive but rushed (e.g., 'limited spots', 'few remaining').");
   } else if (adJson.offer_type === "free_trial") {
-    rules.push("- Highlight the risk-free / no-commitment angle.");
+    rules.push("- De-risk the decision: Highlight that the offer is risk-free, complimentary, or requires no commitment.");
   } else if (adJson.offer_type === "discount") {
-    rules.push("- Emphasise the saving or value angle.");
+    rules.push("- Focus on value: Make the financial savings or bonus feel like a steal.");
   }
 
   if (adJson.cta_style === "action") {
-    rules.push("- Use imperative verbs for CTA copy: Get, Start, Book, Grab, Claim, etc.");
+    rules.push("- Drive action: Use strong, imperative verbs for CTA areas (e.g., Get, Start, Book, Grab, Claim).");
   } else if (adJson.cta_style === "aggressive") {
-    rules.push("- Use bold, direct commands. No hedging.");
+    rules.push("- Be extremely direct: Tell the user exactly what to do next with absolute confidence. No hesitation.");
   } else if (adJson.cta_style === "curiosity") {
-    rules.push("- Tease the outcome without fully revealing it.");
+    rules.push("- Spark curiosity: Tease the value or outcome without giving everything away to entice the click.");
   }
 
   if (adJson.tone.includes("aspirational")) {
-    rules.push("- Frame copy around outcomes and achievements, not features.");
+    rules.push("- Elevate the pitch: Frame the copy around desired outcomes, identity, and prestige rather than just features.");
   }
   if (adJson.tone.includes("emotional")) {
-    rules.push("- Tap into feelings and desired identity, not just logic.");
+    rules.push("- Evoke feeling: Connect with the user's pain points, desires, and emotions over pure logic.");
   }
   if (adJson.tone.includes("trust")) {
-    rules.push("- Reinforce reliability and safety; avoid hype.");
+    rules.push("- Build confidence: Rely on credibility, reliability, and safety. Avoid hype or over-promising.");
   }
 
   return rules.length > 0
-    ? `INTENT RULES (apply these directly):\n${rules.join("\n")}`
+    ? `STRATEGIC COPYWRITING RULES for this campaign:\n${rules.join("\n")}`
     : "";
 }
 
 function buildPrompt(adJson: AdJson, zones: Zone[]): string {
   const adFacts = [
-    `primary_goal: ${adJson.primary_goal}`,
-    `offer_type: ${adJson.offer_type}`,
-    `urgency_level: ${adJson.urgency_level}`,
-    `cta_style: ${adJson.cta_style}`,
-    `key_messages: ${JSON.stringify(adJson.key_messages)}`,
-    `keywords: ${JSON.stringify(adJson.keywords)}`,
-    `target_audience: ${adJson.target_audience}`,
+    `Primary Goal: ${adJson.primary_goal}`,
+    `Offer Type: ${adJson.offer_type}`,
+    `Urgency Level: ${adJson.urgency_level}`,
+    `CTA Style: ${adJson.cta_style}`,
+    `Key Messages: ${adJson.key_messages.join(" | ")}`,
+    `Keywords: ${adJson.keywords.join(", ")}`,
+    `Target Audience: ${adJson.target_audience}`,
   ].join("\n");
 
   const zoneInstructions = zones
     .map(
       (z) =>
-        `  ${z.zone} (max ${z.max_chars} characters):\n    current: "${z.current_text}"`
+        `  - Zone: "${z.zone}"
+    Max Characters: ${z.max_chars}
+    Original Text: "${z.current_text}"`
     )
     .join("\n\n");
 
   const rules = buildRules(adJson);
 
-  return `AD INTENT — use only these facts:
+  return `AD CAMPAIGN CONTEXT:
 ${adFacts}
 
-${rules ? rules + "\n\n" : ""}ZONES TO REWRITE — create message-match copy for each:
+${rules ? rules + "\n\n" : ""}ZONES TO REWRITE:
+Please rewrite the following zones to match the ad campaign's intent, maintaining length constraints but dramatically improving the persuasive angle.
+
 ${zoneInstructions}
 
-RULES:
-- Respect maximum character limits strictly
-- Do not use any numbers or statistics not present in the ad facts
-- No HTML, no CSS selectors, no JavaScript, no code
-- No markdown, no explanation, no extra fields
-- Return ONLY valid JSON in this exact shape:
-{
-  "zones": {
-    "headline": "...",
-    "subheadline": "...",
-    "cta": "...",
-    "badge": "..."
-  }
-}
-Omit zone keys that are not present in the ZONES list above.`.trim();
+REWRITING INSTRUCTIONS:
+1. Context is Key: Understand what a "headline" vs "subheadline" vs "cta" implies. A headline should be catchy and value-driven; a CTA should be action-oriented.
+2. Be Persuasive, Not Robotic: Do not just blindly copy the ad facts. Weave the ad's main angle, tone, and offer into high-converting, natural-sounding, human-centric copy.
+3. Message Match: The transition from the ad to the landing page must feel continuous and natural.
+4. Constraints: Respect maximum character limits strictly. Do not use any numbers or statistics not present in the ad facts. Provide plain text strings only without markdown or HTML.
+`.trim();
 }
 
 export async function rewriteContent(
   state: PipelineState
 ): Promise<Partial<PipelineState>> {
   const { zones, adJson } = state;
+  const t = Date.now();
+
+  log.step(NODE, `Rewriting ${zones.length} zone(s)`, {
+    zones: zones.map((z) => z.zone),
+  });
 
   if (!adJson) {
-    console.warn("[rewriteContent] adJson missing, returning zones unchanged");
+    log.warn(NODE, "adJson missing — returning zones unchanged");
     return { rewrittenZones: zones.map((z) => ({ ...z, new_text: null })) };
   }
+
+  const prompt = buildPrompt(adJson, zones);
+  log.info(NODE, `Built prompt (${prompt.length} chars) — sending to Ollama (${OLLAMA_MODEL})…`);
+
+  const zoneProperties: Record<string, { type: "string" }> = {};
+  zones.forEach(z => {
+    zoneProperties[z.zone] = { type: "string" };
+  });
+
+  const formatSchema = {
+    type: "object",
+    properties: {
+      rationale: { type: "string" },
+      zones: {
+        type: "object",
+        properties: zoneProperties,
+        required: zones.map(z => z.zone)
+      }
+    },
+    required: ["rationale", "zones"]
+  };
 
   let responseText = "";
 
   try {
+    log.info(NODE, `POST ${OLLAMA_BASE_URL}/api/generate`);
     const res = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        system: `You are a CRO copywriter. You rewrite landing page text to match ad creatives.
-Return only valid JSON. Never invent facts. Never produce HTML, selectors, or code. Only text strings.`,
-        prompt: buildPrompt(adJson, zones),
+        system: `You are a world-class Conversion Rate Optimization (CRO) copywriter. 
+Your task is to rewrite specific text zones on a landing page so they seamlessly align with the user intent driven by an incoming ad campaign. 
+Return ONLY valid JSON according to the requested schema. Provide a rationale string explaining your strategy, then the rewritten text for each zone.`,
+        prompt,
+        format: formatSchema,
         stream: false,
-        options: { temperature: 0.2, top_p: 0.9 },
+        options: { temperature: 0.6, top_p: 0.9 },
       }),
     });
 
     if (!res.ok) {
-      throw new Error(`Ollama responded with ${res.status}`);
+      const errText = await res.text();
+      throw new Error(`Ollama responded with ${res.status}: ${errText}`);
     }
 
     const data = (await res.json()) as { response?: string };
     responseText = String(data.response ?? "").trim();
+    log.info(NODE, `Ollama response received in ${elapsed(t)}`, {
+      preview: responseText.slice(0, 200) + (responseText.length > 200 ? "…" : ""),
+    });
   } catch (error) {
-    console.warn("[rewriteContent] Ollama request failed:", (error as Error).message);
+    log.warn(NODE, `Ollama request failed — returning zones unchanged: ${(error as Error).message}`);
     return { rewrittenZones: zones.map((z) => ({ ...z, new_text: null })) };
   }
 
   let zoneMap: Record<string, string> = {};
+  let rationale = "";
 
   try {
     const parsed = JSON.parse(sanitizeJson(responseText)) as {
+      rationale?: string;
       zones?: Record<string, string>;
     };
     zoneMap =
       parsed.zones && typeof parsed.zones === "object" ? parsed.zones : {};
+    rationale = parsed.rationale ?? "";
+
+    if (rationale) {
+      log.info(NODE, `Copywriter rationale: ${rationale}`);
+    }
   } catch {
-    console.warn("[rewriteContent] JSON parse failed, returning zones unchanged");
+    log.warn(NODE, "JSON parse failed — returning zones unchanged");
   }
 
   const rewrittenZones = zones.map((z) => ({
     ...z,
     new_text: zoneMap[z.zone] ?? null,
   }));
+
+  log.step(NODE, `Rewrites applied (${elapsed(t)})`, {
+    results: rewrittenZones.map((z) => ({
+      zone: z.zone,
+      before: z.current_text.slice(0, 50),
+      after: z.new_text ? z.new_text.slice(0, 50) : "(null — fallback)",
+    })),
+  });
 
   return { rewrittenZones };
 }
