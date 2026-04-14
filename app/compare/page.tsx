@@ -101,7 +101,7 @@ export default function ComparePage() {
       <main className="compare-shell">
         <div
           className="glow-orb"
-          style={{ width: 600, height: 600, top: -200, left: -200, background: "rgba(162,89,255,0.09)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }}
+          style={{ width: 600, height: 600, top: -200, left: -200, background: "rgba(37, 99, 235, 0.12)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }}
         />
         <section className="compare-empty glass-strong" style={{ position: "relative", zIndex: 1 }}>
           <span className="eyebrow" style={{ marginBottom: 20 }}>No data</span>
@@ -126,8 +126,8 @@ export default function ComparePage() {
   return (
     <main className="compare-shell">
       {/* Glow orbs */}
-      <div className="glow-orb" style={{ width: 500, height: 500, top: -100, left: -150, background: "rgba(162,89,255,0.10)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }} />
-      <div className="glow-orb" style={{ width: 360, height: 360, top: 200, right: -80, background: "rgba(232,61,77,0.09)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }} />
+      <div className="glow-orb" style={{ width: 500, height: 500, top: -100, left: -150, background: "rgba(37, 99, 235, 0.12)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }} />
+      <div className="glow-orb" style={{ width: 360, height: 360, top: 200, right: -80, background: "rgba(6, 182, 212, 0.12)", position: "fixed", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none", zIndex: 0 }} />
 
       {/* Hero */}
       <section className="compare-hero" style={{ position: "relative", zIndex: 1 }}>

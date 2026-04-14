@@ -153,20 +153,18 @@ export default function HomePage() {
   return (
     <main className="troopod-shell">
       {/* Decorative glow orbs */}
-      <div className="glow-orb" style={{ width: 500, height: 500, top: -120, left: -140, background: "rgba(162,89,255,0.10)" }} />
-      <div className="glow-orb" style={{ width: 380, height: 380, top: 80, right: -100, background: "rgba(232,61,77,0.09)" }} />
+      <div className="glow-orb" style={{ width: 500, height: 500, top: -120, left: -140, background: "rgba(37, 99, 235, 0.12)" }} />
+      <div className="glow-orb" style={{ width: 380, height: 380, top: 80, right: -100, background: "rgba(6, 182, 212, 0.12)" }} />
 
       {/* ── Hero ── */}
       <section className="hero">
-        <span className="eyebrow">AutoCRO · Powered by Local AI</span>
+       
         <h1>
-          Your ads speak.<br />
-          <span className="accent-word">Make your pages listen.</span>
+          Automated CRO.<br />
+          <span className="accent-word">Visualise your optimizations.</span>
         </h1>
         <p>
-          Drop in an ad creative, paste a landing page URL — AutoCRO reads the ad's intent,
-          rewrites your page copy to match it, and hands you before/after evidence.
-          Zero external APIs. Runs entirely on your machine.
+          Provide an ad creative and your landing page — AutoCRO intelligently rewrites your page copy to match the ad's core intent. Discover instant opportunities and generate a crystal-clear visual comparison of what your site looks like after CRO optimisation.
         </p>
       </section>
 
@@ -238,11 +236,11 @@ export default function HomePage() {
               CTA), rewrites them to align with the ad's message, and injects the changes
               — all locally.
             </p>
-            <p className="hint" style={{ marginTop: 8 }}>
+            {/* <p className="hint" style={{ marginTop: 8 }}>
               Accepts <code className="hint">multipart/form-data</code> with{" "}
               <code className="hint">adFile</code> or <code className="hint">adUrl</code> plus{" "}
               <code className="hint">pageUrl</code>.
-            </p>
+            </p> */}
           </div>
         </div>
 

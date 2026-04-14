@@ -5,7 +5,7 @@ import {
   OLLAMA_MODEL,
 } from "./constants";
 
-export const use_openrouter = true;
+export const use_openrouter = false;
 
 export interface LlmRequest {
   system: string;
